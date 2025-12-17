@@ -4,8 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const entityList = document.getElementById('entity-list');
     const statusMessage = document.getElementById('status-message');
 
-    const API_URL = 'https://projectScan.onrender.com/analyze-text';
-
+    const API_URL = 'https://projectscan-oiwo.onrender.com/analyze-text';
     function renderResults(data) {
         entityList.innerHTML = '';
         
