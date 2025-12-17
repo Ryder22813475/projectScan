@@ -4,48 +4,57 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # 讓你的網頁可以跨網域呼叫 API
 
 # ----------------------------------------
 # 配置區
 # ----------------------------------------
-# 透過 API 呼叫模型，不需要在 Render 本地載入
-API_URL_HF = "https://api-inference.huggingface.co/models/xlm-roberta-large-finetuned-conll03-english"
-# 將你的 Token 放入環境變數或直接暫貼在此 (建議部署時設定在 Render 的 Environment Variables)
-HF_TOKEN = os.environ.get("HF_TOKEN", "你的_HF_TOKEN_貼在這裡")
+# 使用支援中文的人名辨識模型 (CKIP)
+API_URL_HF = "https://api-inference.huggingface.co/models/ckiplab/bert-base-chinese-ner"
+HF_TOKEN = os.environ.get("HF_TOKEN")
 headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
+# 1. 新增首頁路徑：讓你訪問網址時不會看到 Not Found
+@app.route('/')
+def home():
+    return "<h1>API 伺服器運作中！</h1><p>請確認在 JS 中使用的網址結尾包含 /analyze-text</p>"
+
 def query_huggingface(text):
-    """直接呼叫 Hugging Face 的推理 API"""
+    """呼叫 Hugging Face 的推理 API"""
     payload = {"inputs": text, "options": {"wait_for_model": True}}
     response = requests.post(API_URL_HF, headers=headers, json=payload)
     return response.json()
 
 @app.route('/analyze-text', methods=['POST'])
 def analyze():
+    # 檢查 Token
+    if not HF_TOKEN:
+        return jsonify({"error": "後端未設定 HF_TOKEN 環境變數"}), 500
+
     data = request.get_json()
     if not data or 'chapterName' not in data[0]:
-        return jsonify({"error": "Invalid input"}), 400
+        return jsonify({"error": "無效的輸入數據"}), 400
 
     text = data[0]['chapterName']
     
-    # 呼叫外部 AI 模型
+    # 呼叫 AI 模型
     ner_results = query_huggingface(text)
     
-    # 如果回傳的是錯誤訊息
+    # 錯誤處理 (例如 API 正在載入)
     if isinstance(ner_results, dict) and "error" in ner_results:
         return jsonify(ner_results), 500
 
-    # 處理並過濾數據 (只保留 Person)
+    # 處理並過濾數據 (只保留 PERSON 人名)
     people = {}
     for ent in ner_results:
-        # 英文模型標籤通常是 'entity_group' 或 'entity'
+        # CKIP 模型的標籤通常是 'entity_group'
         label = ent.get('entity_group') or ent.get('entity')
-        if label in ["PER", "PERSON"]:
+        if label == "PERSON":
             name = ent['word'].strip().replace(" ", "")
-            people[name] = people.get(name, 0) + 1
+            if len(name) > 1: # 避免抓到單個字
+                people[name] = people.get(name, 0) + 1
 
-    # 格式化回傳給你的 JS
+    # 格式化回傳
     named_entities = []
     total_mentions = sum(people.values())
     
@@ -60,7 +69,8 @@ def analyze():
     return jsonify({
         "document_id": data[0].get('chapterID', '001'),
         "named_entities": named_entities,
-        "total_person_count": total_mentions
+        "total_person_count": total_mentions,
+        "analysis_status": "Completed"
     })
 
 if __name__ == '__main__':
