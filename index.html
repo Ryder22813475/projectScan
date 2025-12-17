@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NerSCAN | Bold Analysis UI</title>
+    <link rel="stylesheet" href="style.css"> 
+</head>
+<body>
+    <div class="main-viewport">
+        <header class="input-panel">
+            <div class="brand">
+                <h1> Transformers <BR><small> 人物文本辨識 1.0版</small></h1>
+                <p id="status-message">Ready to Scan</p>
+            </div>
+            <textarea id="text-input" placeholder="請輸入文本進行分析..."></textarea>
+            <button id="analyze-button">EXECUTE<br>ANALYSIS</button>
+        </header>
+
+        <main class="content-panel">
+            <section class="column characters-column">
+                <div class="column-header">🎯 辨識出的人物名稱</div>
+                <div id="entity-list" class="entity-grid">
+                    <p class="placeholder-text">等待數據輸入...</p>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="character_name.js"></script>
+</body>
+</html>

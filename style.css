@@ -1,0 +1,100 @@
+* {
+  box-sizing: border-box;
+}
+
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  font-family: "Courier New", Courier, monospace;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.main-viewport {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.input-panel {
+  height: 200px;
+  display: flex;
+  border-bottom: 4px solid #000;
+}
+.input-panel .brand {
+  width: 250px;
+  padding: 20px;
+  border-right: 4px solid #000;
+}
+.input-panel .brand h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+.input-panel .brand small {
+  font-size: 0.8rem;
+  background: #000;
+  color: #fff;
+  padding: 2px 5px;
+}
+.input-panel textarea {
+  flex: 1;
+  border: none;
+  padding: 20px;
+  font-size: 1.1rem;
+  outline: none;
+}
+.input-panel button {
+  width: 180px;
+  border: none;
+  border-left: 4px solid #000;
+  background: #000;
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+}
+.input-panel button:hover {
+  background: #333;
+}
+
+.content-panel {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+.content-panel .column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.content-panel .column .column-header {
+  padding: 10px;
+  background: #000;
+  color: #fff;
+  font-weight: bold;
+  text-align: center;
+  border-bottom: 4px solid #000;
+}
+.content-panel .column .entity-grid {
+  padding: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  overflow-y: auto;
+  align-content: flex-start;
+}
+
+.entity-card {
+  border: 4px solid #000;
+  background: #fff;
+  padding: 15px;
+  flex: 1 1 0px;
+  min-width: 220px;
+  max-width: calc(100% / min(var(--item-count, 1), 5) - 20px);
+}
+.entity-card h4 {
+  margin: 0 0 10px 0;
+  padding-bottom: 5px;
+  border-bottom: 2px solid #000;
+  font-size: 1.3rem;
+}/*# sourceMappingURL=style.css.map */
