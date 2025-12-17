@@ -1,10 +1,11 @@
 import os
 import requests
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
-app = Flask(__name__)
-CORS(app)  # 讓你的網頁可以跨網域呼叫 API
+# 設定 Flask：static_folder='.' 表示在根目錄尋找靜態檔案 (HTML/JS/CSS)
+app = Flask(__name__, static_folder='.', static_url_path='')
+CORS(app)
 
 # ----------------------------------------
 # 配置區
@@ -14,11 +15,17 @@ API_URL_HF = "https://api-inference.huggingface.co/models/ckiplab/bert-base-chin
 HF_TOKEN = os.environ.get("HF_TOKEN")
 headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
-# 1. 新增首頁路徑：讓你訪問網址時不會看到 Not Found
+# ----------------------------------------
+# 路由 1：託管前端網頁
+# ----------------------------------------
 @app.route('/')
-def home():
-    return "<h1>API 伺服器運作中！</h1><p>請確認在 JS 中使用的網址結尾包含 /analyze-text</p>"
+def index():
+    """當使用者訪問根目錄時，回傳 index.html"""
+    return send_from_directory('.', 'index.html')
 
+# ----------------------------------------
+# 路由 2：AI 分析介面
+# ----------------------------------------
 def query_huggingface(text):
     """呼叫 Hugging Face 的推理 API"""
     payload = {"inputs": text, "options": {"wait_for_model": True}}
@@ -47,10 +54,11 @@ def analyze():
     # 處理並過濾數據 (只保留 PERSON 人名)
     people = {}
     for ent in ner_results:
-        # CKIP 模型的標籤通常是 'entity_group'
         label = ent.get('entity_group') or ent.get('entity')
         if label == "PERSON":
             name = ent['word'].strip().replace(" ", "")
+            # 針對 CKIP 模型的特殊字元處理 (例如 ##)
+            name = name.replace("#", "")
             if len(name) > 1: # 避免抓到單個字
                 people[name] = people.get(name, 0) + 1
 
@@ -74,5 +82,6 @@ def analyze():
     })
 
 if __name__ == '__main__':
+    # Render 會提供 PORT 環境變數
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
