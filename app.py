@@ -3,87 +3,81 @@ import requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
-# 設定 Flask：static_folder='.' 表示在根目錄尋找靜態檔案 (HTML/JS/CSS)
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# ----------------------------------------
-# 配置區
-# ----------------------------------------
-# 使用支援中文的人名辨識模型 (CKIP)
 API_URL_HF = "https://api-inference.huggingface.co/models/ckiplab/bert-base-chinese-ner"
+# 🔴 這裡確保從環境變數讀取，若讀不到會變 None
 HF_TOKEN = os.environ.get("HF_TOKEN")
-headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
-# ----------------------------------------
-# 路由 1：託管前端網頁
-# ----------------------------------------
 @app.route('/')
 def index():
-    """當使用者訪問根目錄時，回傳 index.html"""
     return send_from_directory('.', 'index.html')
 
-# ----------------------------------------
-# 路由 2：AI 分析介面
-# ----------------------------------------
 def query_huggingface(text):
-    """呼叫 Hugging Face 的推理 API"""
+    if not HF_TOKEN:
+        return {"error": "HF_TOKEN 尚未在 Render 設定"}
+    
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     payload = {"inputs": text, "options": {"wait_for_model": True}}
-    response = requests.post(API_URL_HF, headers=headers, json=payload)
-    return response.json()
+    
+    try:
+        response = requests.post(API_URL_HF, headers=headers, json=payload, timeout=30)
+        return response.json()
+    except Exception as e:
+        return {"error": f"連線至 Hugging Face 失敗: {str(e)}"}
 
 @app.route('/analyze-text', methods=['POST'])
 def analyze():
-    if not HF_TOKEN:
-        print("❌ 錯誤: 找不到 HF_TOKEN 環境變數")
-        return jsonify({"error": "HF_TOKEN not found"}), 500
+    try:
+        data = request.get_json()
+        if not data or 'chapterName' not in data[0]:
+            return jsonify({"error": "輸入資料格式不正確"}), 400
 
-    data = request.get_json()
-    text = data[0]['chapterName']
-    
-    print(f"--- 正在分析文字: {text[:20]}... ---")
-    
-    # 呼叫 AI 模型
-    ner_results = query_huggingface(text)
-    
-    # 🟢 這裡非常重要：把 AI 回傳的內容印在 Render Logs 裡
-    print(f"AI 模型原始回傳結果: {ner_results}")
-    
-    if isinstance(ner_results, dict) and "error" in ner_results:
-        print(f"❌ AI 模型回報錯誤: {ner_results['error']}")
-        return jsonify(ner_results), 500
+        text = data[0]['chapterName']
+        ner_results = query_huggingface(text)
 
-    # 處理並過濾數據 (只保留 PERSON 人名)
-    people = {}
-    for ent in ner_results:
-        label = ent.get('entity_group') or ent.get('entity')
-        if label == "PERSON":
-            name = ent['word'].strip().replace(" ", "")
-            # 針對 CKIP 模型的特殊字元處理 (例如 ##)
-            name = name.replace("#", "")
-            if len(name) > 1: # 避免抓到單個字
-                people[name] = people.get(name, 0) + 1
+        # 🟢 處理 AI 模型回傳的各種狀況
+        if isinstance(ner_results, dict) and "error" in ner_results:
+            # 這會把 Hugging Face 的原話（如 Model loading）傳給前端
+            return jsonify({
+                "error": "AI 模型回報錯誤",
+                "details": ner_results["error"]
+            }), 502 
 
-    # 格式化回傳
-    named_entities = []
-    total_mentions = sum(people.values())
-    
-    for name, count in people.items():
-        named_entities.append({
-            "name": name,
-            "entity_type": "Person",
-            "count": count,
-            "importance_score": round(count / total_mentions, 2) if total_mentions > 0 else 0
+        if not isinstance(ner_results, list):
+            return jsonify({"error": "AI 回傳格式非列表", "raw": str(ner_results)}), 500
+
+        people = {}
+        for ent in ner_results:
+            label = ent.get('entity_group') or ent.get('entity')
+            if label == "PERSON":
+                name = ent['word'].strip().replace(" ", "").replace("#", "")
+                if len(name) > 1:
+                    people[name] = people.get(name, 0) + 1
+
+        named_entities = []
+        total_mentions = sum(people.values())
+        for name, count in people.items():
+            named_entities.append({
+                "name": name,
+                "entity_type": "Person",
+                "count": count,
+                "importance_score": round(count / total_mentions, 2) if total_mentions > 0 else 0
+            })
+
+        return jsonify({
+            "document_id": data[0].get('chapterID', '001'),
+            "named_entities": named_entities,
+            "total_person_count": total_mentions,
+            "analysis_status": "Completed"
         })
 
-    return jsonify({
-        "document_id": data[0].get('chapterID', '001'),
-        "named_entities": named_entities,
-        "total_person_count": total_mentions,
-        "analysis_status": "Completed"
-    })
+    except Exception as e:
+        # 🟢 如果真的崩潰了，把錯誤訊息印出來
+        print(f"Server Error: {str(e)}")
+        return jsonify({"error": "伺服器內部錯誤", "message": str(e)}), 500
 
 if __name__ == '__main__':
-    # Render 會提供 PORT 環境變數
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
