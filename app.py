@@ -34,21 +34,23 @@ def query_huggingface(text):
 
 @app.route('/analyze-text', methods=['POST'])
 def analyze():
-    # 檢查 Token
     if not HF_TOKEN:
-        return jsonify({"error": "後端未設定 HF_TOKEN 環境變數"}), 500
+        print("❌ 錯誤: 找不到 HF_TOKEN 環境變數")
+        return jsonify({"error": "HF_TOKEN not found"}), 500
 
     data = request.get_json()
-    if not data or 'chapterName' not in data[0]:
-        return jsonify({"error": "無效的輸入數據"}), 400
-
     text = data[0]['chapterName']
+    
+    print(f"--- 正在分析文字: {text[:20]}... ---")
     
     # 呼叫 AI 模型
     ner_results = query_huggingface(text)
     
-    # 錯誤處理 (例如 API 正在載入)
+    # 🟢 這裡非常重要：把 AI 回傳的內容印在 Render Logs 裡
+    print(f"AI 模型原始回傳結果: {ner_results}")
+    
     if isinstance(ner_results, dict) and "error" in ner_results:
+        print(f"❌ AI 模型回報錯誤: {ner_results['error']}")
         return jsonify(ner_results), 500
 
     # 處理並過濾數據 (只保留 PERSON 人名)
